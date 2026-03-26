@@ -1,10 +1,13 @@
-from fastapi import FastAPI, Depends, Response
+from fastapi import FastAPI, Depends, Response, HTTPException, Cookie
 from sqlalchemy.orm import Session
-from shared.database import SessionLocal
+from sqlalchemy import text
+from shared.AuthDatabase import SessionLocal
 from passlib.context import CryptContext
+import hashlib
 
 app = FastAPI()
-pwd_context = CryptContext(schemes=["bcrypt"])
+
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 def get_db():
     db = SessionLocal()
@@ -13,18 +16,61 @@ def get_db():
     finally:
         db.close()
 
+def hash_password(password: str):
+    sha256_hash = hashlib.sha256(password.encode()).hexdigest()
+    return pwd_context.hash(sha256_hash)
+
+def verify_password(password: str, hashed: str):
+    sha256_hash = hashlib.sha256(password.encode()).hexdigest()
+    return pwd_context.verify(sha256_hash, hashed)
+
+# REGISTER
+@app.post("/register")
+def register(username: str, password: str, role: str, db: Session = Depends(get_db)):
+    if role not in ["owner", "seller"]:
+        raise HTTPException(400, "Invalid role")
+
+    existing = db.execute(text("SELECT * FROM Users WHERE username=:u"), {"u": username}).fetchone()
+    if existing:
+        raise HTTPException(400, "User exists")
+
+    db.execute(text("""
+        INSERT INTO Users (username, password, role)
+        VALUES (:u, :p, :r)
+    """), {"u": username, "p": hash_password(password), "r": role})
+
+    db.commit()
+    return {"message": "Registered"}
+
+# LOGIN
 @app.post("/login")
 def login(username: str, password: str, response: Response, db: Session = Depends(get_db)):
-    user = db.execute(f"SELECT * FROM Users WHERE username='{username}'").fetchone()
+    user = db.execute(text("SELECT * FROM Users WHERE username=:u"), {"u": username}).fetchone()
 
-    if not user:
-        return {"error": "User not found"}
+    if not user or not verify_password(password, user.password):
+        raise HTTPException(401, "Invalid credentials")
 
-    if not pwd_context.verify(password, user.password):
-        return {"error": "Wrong password"}
+    response.set_cookie("user_id", str(user.id), httponly=True)
+    response.set_cookie("role", user.role, httponly=True)
 
-    # Set cookie (SESSION)
-    response.set_cookie(key="user_id", value=str(user.id))
-    response.set_cookie(key="role", value=user.role)
+    return {"message": "Login success"}
 
-    return {"message": "Login success", "role": user.role}
+# VALIDATE
+@app.get("/validate")
+def validate(user_id: int = Cookie(None), role: str = Cookie(None), db: Session = Depends(get_db)):
+    if not user_id or not role:
+        raise HTTPException(401, "Not logged in")
+
+    user = db.execute(text("SELECT * FROM Users WHERE id=:id"), {"id": user_id}).fetchone()
+
+    if not user or user.role != role:
+        raise HTTPException(403, "Invalid session")
+
+    return {"user_id": user.id, "role": user.role}
+
+# LOGOUT
+@app.post("/logout")
+def logout(response: Response):
+    response.delete_cookie("user_id")
+    response.delete_cookie("role")
+    return {"message": "Logged out"}

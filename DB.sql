@@ -45,3 +45,5 @@ CREATE TABLE Returns (
     refund_amount FLOAT,
     created_at DATETIME DEFAULT GETDATE()
 );
+
+select * from Products
