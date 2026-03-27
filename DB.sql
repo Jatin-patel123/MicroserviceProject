@@ -25,7 +25,7 @@ CREATE TABLE Products (
 CREATE DATABASE BillingDB;
 
 USE BillingDB;
-
+select * from BillItems
 CREATE TABLE BillItems (
     id INT PRIMARY KEY IDENTITY,
     bill_id INT,
@@ -37,7 +37,7 @@ CREATE TABLE BillItems (
 CREATE DATABASE ReturnDB;
 
 USE ReturnDB
-
+select * from Returns
 CREATE TABLE Returns (
     id INT PRIMARY KEY IDENTITY,
     product_id INT,
@@ -47,3 +47,7 @@ CREATE TABLE Returns (
 );
 
 select * from Products
+
+
+ALTER TABLE BillItems ADD created_at DATETIME DEFAULT GETDATE();
+ALTER TABLE Returns ADD created_at DATETIME DEFAULT GETDATE();
