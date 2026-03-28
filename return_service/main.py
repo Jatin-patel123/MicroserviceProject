@@ -9,7 +9,6 @@ app = FastAPI()
 PRODUCT_URL = "http://127.0.0.1:8002"
 AUTH_URL = "http://127.0.0.1:8001"
 
-# ---------------- DB ----------------
 def get_db():
     db = SessionLocal()
     try:
@@ -17,16 +16,14 @@ def get_db():
     finally:
         db.close()
 
-# ---------------- AUTH ----------------
 def validate(user_id, role):
     res = requests.get(
         f"{AUTH_URL}/validate",
-        cookies={"user_id": str(user_id), "role": role}  # ✅ FIX
+        cookies={"user_id": str(user_id), "role": role} 
     )
     if res.status_code != 200:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-# ---------------- RETURN ----------------
 @app.post("/return-product")
 def return_product(
     product_id: int,
@@ -37,10 +34,9 @@ def return_product(
 ):
     validate(user_id, role)
 
-    # ✅ Get product
     response = requests.get(
         f"{PRODUCT_URL}/get-product/{product_id}",
-        cookies={"user_id": str(user_id), "role": role}  # ✅ FIX
+        cookies={"user_id": str(user_id), "role": role} 
     )
 
     if response.status_code != 200:
@@ -48,20 +44,17 @@ def return_product(
 
     product = response.json()
 
-    # ✅ Calculate refund
     refund = product["selling_price"] * quantity
 
-    # ✅ Increase stock
     stock_res = requests.put(
         f"{PRODUCT_URL}/increase-stock/{product_id}",
         params={"quantity": quantity},
-        cookies={"user_id": str(user_id), "role": role}  # ✅ FIX
+        cookies={"user_id": str(user_id), "role": role}  
     )
 
     if stock_res.status_code != 200:
         raise HTTPException(400, detail="Stock update failed")
 
-    # ✅ Save return
     db.execute(text("""
         INSERT INTO Returns (product_id, quantity, refund_amount)
         VALUES (:p, :q, :r)
@@ -78,7 +71,6 @@ def return_product(
         "refund": refund
     }
 
-# ---------------- REPORT ----------------
 @app.get("/daily-returns")
 def daily_returns(db: Session = Depends(get_db)):
     result = db.execute(text("""

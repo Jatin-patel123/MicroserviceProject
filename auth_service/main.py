@@ -24,7 +24,6 @@ def verify_password(password: str, hashed: str):
     sha256_hash = hashlib.sha256(password.encode()).hexdigest()
     return pwd_context.verify(sha256_hash, hashed)
 
-# REGISTER
 @app.post("/register")
 def register(username: str, password: str, role: str, db: Session = Depends(get_db)):
     if role not in ["owner", "seller"]:
@@ -42,7 +41,6 @@ def register(username: str, password: str, role: str, db: Session = Depends(get_
     db.commit()
     return {"message": "Registered"}
 
-# LOGIN
 @app.post("/login")
 def login(username: str, password: str, response: Response, db: Session = Depends(get_db)):
     user = db.execute(text("SELECT * FROM Users WHERE username=:u"), {"u": username}).fetchone()
@@ -55,7 +53,6 @@ def login(username: str, password: str, response: Response, db: Session = Depend
 
     return {"message": "Login success"}
 
-# VALIDATE
 @app.get("/validate")
 def validate(user_id: int = Cookie(None), role: str = Cookie(None), db: Session = Depends(get_db)):
     if not user_id or not role:
@@ -68,7 +65,6 @@ def validate(user_id: int = Cookie(None), role: str = Cookie(None), db: Session 
 
     return {"user_id": user.id, "role": user.role}
 
-# LOGOUT
 @app.post("/logout")
 def logout(response: Response):
     response.delete_cookie("user_id")
